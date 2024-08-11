@@ -1,0 +1,5 @@
+# Dockerfile_fedora
+FROM pycontribs/fedora
+RUN mkdir -p /tmp/.ansible/tmp && chmod -R 777 /tmp/.ansible/tmp
+RUN dnf install -y python3 python3-pip && dnf clean all
+RUN pip3 install ansible
