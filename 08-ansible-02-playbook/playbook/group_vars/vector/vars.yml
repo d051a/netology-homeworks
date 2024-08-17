@@ -1,0 +1,5 @@
+---
+vector_version: "0.39.0"
+vector_install_path: "/opt/vector"
+vector_config_path: "/etc/vector"
+vector_config_template: "vector_config.j2"
