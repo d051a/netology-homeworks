@@ -1,164 +1,160 @@
 ---
-- name: Install Clickhouse
-  hosts: clickhouse
-  handlers:
-    - name: Start clickhouse service
-      become: true
-      ansible.builtin.service:
-        name: clickhouse-server
-        state: restarted
+- name: Install and configure SonarQube and Nexus with passwordless sudo
+  hosts: all
+  become: yes
+  vars:
+    # Common variables
+    java_home: /usr/lib/jvm/jdk
+    sonarqube_user: sonar
+    sonarqube_group: sonar
+    sonarqube_home: /opt/sonarqube
+    sonarqube_version: 9.9.0.65466
+    sonarqube_download_url: "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonarqube_version }}.zip"
+    nexus_user: nexus
+    nexus_group: nexus
+    nexus_version: 3.47.1-01
+    nexus_home: /opt/nexus
+    nexus_download_url: "https://download.sonatype.com/nexus/3/nexus-{{ nexus_version }}-unix.tar.gz"
+    ansible_user: centos  # Change this to the correct user if necessary
+
+  pre_tasks:
+    - name: Allow passwordless sudo for the user
+      become: yes
+      become_user: root
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: "^{{ ansible_user }} ALL="
+        line: "{{ ansible_user }} ALL=(ALL) NOPASSWD: ALL"
+        validate: 'visudo -cf %s'
 
   tasks:
-    - name: Determine package manager
-      ansible.builtin.set_fact:
-        pkg_mgr: "{{ 'dnf' if ansible_os_family == 'RedHat' else 'apt' }}"
-
-    - name: Ensure python3 is installed (RedHat-based)
-      become: true
-      ansible.builtin.dnf:
-        name: python3-dnf
-        state: present
-      when: pkg_mgr == 'dnf'
-
-    - name: Ensure python3 is installed (Debian-based)
-      become: true
-      ansible.builtin.apt:
-        name: python3-apt
-        state: present
-      when: pkg_mgr == 'apt'
-
-    - name: Add Clickhouse repository (RedHat-based)
-      become: true
-      ansible.builtin.yum_repository:
-        name: clickhouse
-        description: ClickHouse Repository
-        baseurl: https://packages.clickhouse.com/rpm/stable/
-        gpgkey: https://packages.clickhouse.com/rpm/stable/repodata/repomd.xml.key
-        gpgcheck: false
-        repo_gpgcheck: false
-        enabled: true
-      when: pkg_mgr == 'dnf'
-
-    - name: Download Clickhouse packages (Debian-based)
-      block:
-        - name: Get clickhouse client package
-          ansible.builtin.get_url:
-            url: "https://packages.clickhouse.com/deb/stable/main/clickhouse-client_{{ clickhouse_version }}_all.deb"
-            dest: "/tmp/clickhouse-client_{{ clickhouse_version }}_all.deb"
-            mode: '0644'
-          when: pkg_mgr == 'apt'
-
-        - name: Get clickhouse common package
-          ansible.builtin.get_url:
-            url: "https://packages.clickhouse.com/deb/stable/main/clickhouse-common-static_{{ clickhouse_version }}_amd64.deb"
-            dest: "/tmp/clickhouse-common-static_{{ clickhouse_version }}_amd64.deb"
-            mode: '0644'
-          when: pkg_mgr == 'apt'
-
-        - name: Get clickhouse server package
-          ansible.builtin.get_url:
-            url: "https://packages.clickhouse.com/deb/stable/main/clickhouse-server_{{ clickhouse_version }}_all.deb"
-            dest: "/tmp/clickhouse-server_{{ clickhouse_version }}_all.deb"
-            mode: '0644'
-          when: pkg_mgr == 'apt'
-
-    - name: Install clickhouse packages (RedHat-based)
-      become: true
-      ansible.builtin.dnf:
+    # Install prerequisites
+    - name: Install required packages
+      yum:
         name:
-          - /tmp/clickhouse-common-static-{{ clickhouse_version }}.x86_64.rpm
-          - /tmp/clickhouse-client-{{ clickhouse_version }}.noarch.rpm
-          - /tmp/clickhouse-server-{{ clickhouse_version }}.noarch.rpm
+          - wget
+          - unzip
+          - java-1.8.0-openjdk
+          - java-1.8.0-openjdk-devel
         state: present
-        disable_gpg_check: true
-      notify: Start clickhouse service
-      when: pkg_mgr == 'dnf'
 
-    - name: Install clickhouse packages (Debian-based)
-      become: true
-      ansible.builtin.command:
-        cmd: "dpkg -i /tmp/{{ item }}"
-      loop:
-        - clickhouse-common-static_{{ clickhouse_version }}_amd64.deb
-        - clickhouse-client_{{ clickhouse_version }}_all.deb
-        - clickhouse-server_{{ clickhouse_version }}_all.deb
-      notify: Start clickhouse service
-      when: pkg_mgr == 'apt'
-      changed_when: false
+    # SonarQube installation tasks
+    - name: Create SonarQube group
+      group:
+        name: "{{ sonarqube_group }}"
+        state: present
 
-    - name: Flush handlers
-      ansible.builtin.meta: flush_handlers
+    - name: Create SonarQube user
+      user:
+        name: "{{ sonarqube_user }}"
+        group: "{{ sonarqube_group }}"
+        home: "{{ sonarqube_home }}"
+        shell: /bin/bash
+        create_home: no
 
-    - name: Create database
-      ansible.builtin.command:
-        cmd: "clickhouse-client -q 'create database logs;'"
-      register: create_db
-      failed_when: create_db.rc != 0 and create_db.rc != 82
-      changed_when: create_db.rc == 0
+    - name: Download SonarQube
+      get_url:
+        url: "{{ sonarqube_download_url }}"
+        dest: /tmp/sonarqube-{{ sonarqube_version }}.zip
 
-- name: Install and configure Vector
-  hosts: vector
+    - name: Extract SonarQube
+      unarchive:
+        src: /tmp/sonarqube-{{ sonarqube_version }}.zip
+        dest: /opt/
+        remote_src: yes
+      notify: change_owner
+
+    - name: Create symlink for SonarQube
+      file:
+        src: "/opt/sonarqube-{{ sonarqube_version }}"
+        dest: "{{ sonarqube_home }}"
+        state: link
+
+    - name: Set ownership for SonarQube
+      file:
+        path: "{{ sonarqube_home }}"
+        owner: "{{ sonarqube_user }}"
+        group: "{{ sonarqube_group }}"
+        recurse: yes
+
+    - name: Configure SonarQube
+      lineinfile:
+        dest: "{{ sonarqube_home }}/conf/sonar.properties"
+        regexp: "^#?sonar.jdbc.username="
+        line: "sonar.jdbc.username=sonar"
+      with_items:
+        - { regexp: "^#?sonar.jdbc.password=", line: "sonar.jdbc.password=sonar" }
+        - { regexp: "^#?sonar.jdbc.url=", line: "sonar.jdbc.url=jdbc:postgresql://localhost:5432/sonar" }
+
+    - name: Configure SonarQube as a service
+      template:
+        src: sonar.service.j2
+        dest: /etc/systemd/system/sonar.service
+      notify:
+        - enable_sonarqube_service
+
+    # Nexus installation tasks
+    - name: Create Nexus group
+      group:
+        name: "{{ nexus_group }}"
+        state: present
+
+    - name: Create Nexus user
+      user:
+        name: "{{ nexus_user }}"
+        group: "{{ nexus_group }}"
+        home: "{{ nexus_home }}"
+        shell: /bin/bash
+        create_home: no
+
+    - name: Download Nexus
+      get_url:
+        url: "{{ nexus_download_url }}"
+        dest: /tmp/nexus-{{ nexus_version }}-unix.tar.gz
+
+    - name: Extract Nexus
+      unarchive:
+        src: /tmp/nexus-{{ nexus_version }}-unix.tar.gz
+        dest: /opt/
+        remote_src: yes
+      notify: change_owner
+
+    - name: Create symlink for Nexus
+      file:
+        src: "/opt/nexus-{{ nexus_version }}"
+        dest: "{{ nexus_home }}"
+        state: link
+
+    - name: Set ownership for Nexus
+      file:
+        path: "{{ nexus_home }}"
+        owner: "{{ nexus_user }}"
+        group: "{{ nexus_group }}"
+        recurse: yes
+
+    - name: Configure Nexus as a service
+      template:
+        src: nexus.service.j2
+        dest: /etc/systemd/system/nexus.service
+      notify:
+        - enable_nexus_service
+
   handlers:
-    - name: Restart vector service
-      become: true
-      ansible.builtin.systemd:
-        name: vector
-        state: restarted
+    - name: change_owner
+      command: chown -R {{ item.user }}:{{ item.group }} {{ item.path }}
+      with_items:
+        - { user: "{{ sonarqube_user }}", group: "{{ sonarqube_group }}", path: "{{ sonarqube_home }}" }
+        - { user: "{{ nexus_user }}", group: "{{ nexus_group }}", path: "{{ nexus_home }}" }
 
-  tasks:
-    - name: Determine package manager
-      ansible.builtin.set_fact:
-        pkg_mgr: "{{ 'dnf' if ansible_os_family == 'RedHat' else 'apt' }}"
+    - name: enable_sonarqube_service
+      systemd:
+        name: sonar
+        enabled: yes
+        state: started
 
-    - name: Create installation directory
-      become: true
-      ansible.builtin.file:
-        path: "{{ vector_install_path }}"
-        state: directory
-        mode: '0755'
-
-    - name: Get Vector distrib (RedHat-based)
-      become: true
-      ansible.builtin.get_url:
-        url: "https://packages.timber.io/vector/{{ vector_version }}/vector-{{ vector_version }}-1.x86_64.rpm"
-        dest: "/tmp/vector-{{ vector_version }}-1.x86_64.rpm"
-        mode: '0644'
-      when: pkg_mgr == 'dnf'
-
-    - name: Get Vector distrib (Debian-based)
-      become: true
-      ansible.builtin.get_url:
-        url: "https://packages.timber.io/vector/{{ vector_version }}/vector_{{ vector_version }}-1_amd64.deb"
-        dest: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
-        mode: '0644'
-      when: pkg_mgr == 'apt'
-
-    - name: Install Vector package (RedHat-based)
-      become: true
-      ansible.builtin.dnf:
-        name: "/tmp/vector-{{ vector_version }}-1.x86_64.rpm"
-        state: present
-      notify: Restart vector service
-      when: pkg_mgr == 'dnf'
-
-    - name: Install Vector package (Debian-based)
-      become: true
-      ansible.builtin.apt:
-        deb: "/tmp/vector_{{ vector_version }}-1_amd64.deb"
-      notify: Restart vector service
-      when: pkg_mgr == 'apt'
-
-    - name: Create configuration directory
-      become: true
-      ansible.builtin.file:
-        path: "{{ vector_config_path }}"
-        state: directory
-        mode: '0755'
-
-    - name: Deploy Vector configuration
-      become: true
-      ansible.builtin.template:
-        src: "templates/vector_config.j2"
-        dest: "{{ vector_config_path }}/vector.toml"
-        mode: '0644'
-      notify: Restart vector service
+    - name: enable_nexus_service
+      systemd:
+        name: nexus
+        enabled: yes
+        state: started
