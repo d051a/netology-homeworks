@@ -8,7 +8,7 @@ resource "yandex_compute_instance" "sonar" {
   }
   boot_disk {
     initialize_params {
-      image_id = "fd8j0uq7qcvtb65fbffl"
+      image_id = "fd837b0gcg6klm9d9nl6"
       size     = 10                      
     }
   }
@@ -19,6 +19,19 @@ resource "yandex_compute_instance" "sonar" {
 
   metadata = {
     ssh-keys = "centos:${file("~/.ssh/id_rsa.pub")}"
+
+    user-data = <<-EOF
+      #cloud-config
+      users:
+        - default
+        - name: centos
+          sudo: ALL=(ALL) NOPASSWD:ALL
+          shell: /bin/bash
+      runcmd:
+        - echo 'centos ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/centos
+        - chmod 0440 /etc/sudoers.d/centos
+        - restorecon -Rv /etc/sudoers.d
+    EOF
   }
 }
 
@@ -32,7 +45,7 @@ resource "yandex_compute_instance" "nexus" {
   }
   boot_disk {
     initialize_params {
-      image_id = "fd8j0uq7qcvtb65fbffl"
+      image_id = "fd837b0gcg6klm9d9nl6"
       size     = 10                      
     }
   }
@@ -44,6 +57,19 @@ resource "yandex_compute_instance" "nexus" {
 
   metadata = {
     ssh-keys = "centos:${file("~/.ssh/id_rsa.pub")}"
+
+    user-data = <<-EOF
+      #cloud-config
+      users:
+        - default
+        - name: centos
+          sudo: ALL=(ALL) NOPASSWD:ALL
+          shell: /bin/bash
+      runcmd:
+        - echo 'centos ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/centos
+        - chmod 0440 /etc/sudoers.d/centos
+        - restorecon -Rv /etc/sudoers.d
+    EOF
   }
 }
 
