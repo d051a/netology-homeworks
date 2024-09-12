@@ -16,7 +16,6 @@
     </repositories>
 
     <dependencies>
-        <!-- Зависимость на ваш артефакт -->
         <dependency>
             <groupId>netology</groupId>
             <artifactId>java</artifactId>
