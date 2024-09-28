@@ -1,9 +1,3 @@
-##Предварительно выполнить на Linux хосте команду: sudo sysctl -w vm.max_map_count=262144
-##https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_set_vm_max_map_count_to_at_least_262144
-#
-##kibana address: http://127.0.0.1:5601 будет доступно через ~1-2 мин
-#
-#
 version: '2.2'
 services:
 
@@ -15,12 +9,14 @@ services:
       - cluster.name=es-docker-cluster
       - discovery.seed_hosts=es-hot,es-warm
       - cluster.initial_master_nodes=es-hot,es-warm
-      - node.roles=master,data_content,data_hot  
+      - node.roles=master,data_content,data_hot
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - "http.host=0.0.0.0"
       - xpack.security.enabled=false
+      - ES_TMPDIR=/usr/share/elasticsearch/tmp
     volumes:
       - data01:/usr/share/elasticsearch/data:Z
+      - ./es_hot_tmp:/usr/share/elasticsearch/tmp:Z
     ulimits:
       memlock:
         soft: -1
@@ -47,8 +43,10 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - xpack.security.enabled=false
       - "http.host=0.0.0.0"
+      - ES_TMPDIR=/usr/share/elasticsearch/tmp
     volumes:
       - data02:/usr/share/elasticsearch/data:Z
+      - ./es_warm_tmp:/usr/share/elasticsearch/tmp:Z
     ulimits:
       memlock:
         soft: -1
@@ -117,7 +115,7 @@ volumes:
     driver: local
   data02:
     driver: local
-  data03:
+  es_temp:
     driver: local
 
 networks:
