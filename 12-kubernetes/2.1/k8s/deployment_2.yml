@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: multitool-daemonset
+  labels:
+    app: multitool-logs
+spec:
+  selector:
+    matchLabels:
+      app: multitool-logs
+  template:
+    metadata:
+      labels:
+        app: multitool-logs
+    spec:
+      containers:
+      - name: multitool
+        image: wbitt/network-multitool:latest
+        command: ["sh", "-c", "tail -f /host-logs/syslog"]
+        volumeMounts:
+        - name: host-logs
+          mountPath: /host-logs
+          readOnly: true
+      volumes:
+      - name: host-logs
+        hostPath:
+          path: /var/log
+          type: Directory

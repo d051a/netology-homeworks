@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dual-container-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dual-container-app
+  template:
+    metadata:
+      labels:
+        app: dual-container-app
+    spec:
+      containers:
+      - name: busybox
+        image: busybox
+        command: ["sh", "-c", "while true; do echo 'Updating file at '$(date) >> /data/shared-file.txt; sleep 5; done"]
+        volumeMounts:
+        - name: shared-data
+          mountPath: /data
+      - name: multitool
+        image: wbitt/network-multitool:latest
+        command: ["sh", "-c", "while true; do cat /data/shared-file.txt; sleep 5; done"]
+        volumeMounts:
+        - name: shared-data
+          mountPath: /data
+      volumes:
+      - name: shared-data
+        emptyDir: {}
