@@ -1,0 +1,95 @@
+---
+# ConfigMap для HTML-страницы
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-html-config
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Secure Web Page</title>
+    </head>
+    <body>
+        <h1>Welcome to Secure Nginx!</h1>
+        <p>This page is served over HTTPS with a self-signed certificate.</p>
+    </body>
+    </html>
+
+---
+# Deployment для Nginx
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-html-volume
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: nginx-html-volume
+        configMap:
+          name: nginx-html-config
+
+---
+# Service для доступа к Nginx
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: NodePort
+
+---
+# Secret для хранения самоподписанного SSL-сертификата
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nginx-tls-secret
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURNekNDQWh1Z0F3SUJBZ0lVRFN5ZFh0Wm5hcCtic3ZZNEZCNStEeUh0TXBFd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0tURVhNQlVHQTFVRUF3d09NVE13TGpFNU15NDBOQzR5TURNeERqQU1CZ05WQkFvTUJVMTVUM0puTUI0WApEVEkwTVRFeU16RTNNVFl4TUZvWERUSTFNVEV5TXpFM01UWXhNRm93S1RFWE1CVUdBMVVFQXd3T01UTXdMakU1Ck15NDBOQzR5TURNeERqQU1CZ05WQkFvTUJVMTVUM0puTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEEKTUlJQkNnS0NBUUVBejZmNUFpbi81OE1YRHQwdk1PN1lqajI2TWdTbWlNOWpENEF6WW9oeGU1Vm9ZL2NqMkJPawpwS0Z0K20wZjlnbW9sQmgwamxGbGdHdFY1QUREcEhGSzVEZzB5WStab1FaVE4vWlBXUlNZejVYZUlaVlNVUnNKClhnNENmcVgxVWJGQTE4dVd4N0h1Yy9Jb1hhZDRzY3U4SHlCLy9LZVBOOW9Gc0hNSCszTGZia05ka2xzUmlGNDIKeG1ab0xOYVdRdFhlZnMrd3RKdTNFa1FLZmlCbGNzUzJzekEvTWgwWXkrRjlsb0E1bjcxRFVuUkF0dEZ4dFdQOAo2aXNaNWxVdEI3NGFvZDFHc0dqTU1Fc2pnZ0VRZ1lRY1lTR2o5ZytmS01STkhzVWRtVmZvem9OMWIvMGV6a2xpCklneVIvMXdGMUREMGxjRnh3dEprdTNlQlJZSEFHNktYWndJREFRQUJvMU13VVRBZEJnTlZIUTRFRmdRVTlLR3IKNVBsMm9OK1RMNXZDK0M0Y0xRYy93OEF3SHdZRFZSMGpCQmd3Rm9BVTlLR3I1UGwyb04rVEw1dkMrQzRjTFFjLwp3OEF3RHdZRFZSMFRBUUgvQkFVd0F3RUIvekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBT0hoWUZZVlNtNGdtCkVCRjJvTFgvdGpJeTdHdkFnTWhQTTBTR2lXOUUyeUtoTVdtYXQrcm1MR3ZBVHR5b1g1TmRkdkRnZSt1ejJMNnMKN0t6WEcxTk14K1VmMWtMaGp2eTNXY21yQXFLMERTSjlkN0ZiSU1DdXllMkVoejBEYUQ5RXhTZjAyU0JiOWJhKwpRdzRQOTg0VW42Tk5mTlBDOU01OFhQWHpIdllJWmYvdlJySWhJUDRmdjhGN0VyZ2d4SDI1MXJzQ2ZtZzZMVjNQCnlrUGxpL3gxS3B5aVN4WmFzam05bXdJV281R3NXUnJlNDcxclZ2bmlZSmZ5WUgxWE9RMzVyT0ZaWlRiUlY0bDAKaTJ4RUZtYndoQlhhcUxId1pDUzJVblRzbDQ4MjI4cmFhTnEwMmdpZ2ZtS0J1c2FMR0FxaWo3YXpMaVYwaVlLeApURWhRSWlxejRnPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUV2d0lCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktrd2dnU2xBZ0VBQW9JQkFRRFBwL2tDS2Yvbnd4Y08KM1M4dzd0aU9QYm95QkthSXoyTVBnRE5paUhGN2xXaGo5eVBZRTZTa29XMzZiUi8yQ2FpVUdIU09VV1dBYTFYawpBTU9rY1Vya09EVEpqNW1oQmxNMzlrOVpGSmpQbGQ0aGxWSlJHd2xlRGdKK3BmVlJzVURYeTViSHNlNXo4aWhkCnAzaXh5N3dmSUgvOHA0ODMyZ1d3Y3dmN2N0OXVRMTJTV3hHSVhqYkdabWdzMXBaQzFkNSt6N0MwbTdjU1JBcCsKSUdWeXhMYXpNRDh5SFJqTDRYMldnRG1mdlVOU2RFQzIwWEcxWS96cUt4bm1WUzBIdmhxaDNVYXdhTXd3U3lPQwpBUkNCaEJ4aElhUDJENThveEUwZXhSMlpWK2pPZzNWdi9SN09TV0lpREpIL1hBWFVNUFNWd1hIQzBtUzdkNEZGCmdjQWJvcGRuQWdNQkFBRUNnZ0VCQU1ZR0YvY1JXRUdLa0pXVEplcVRDcDV5alBvZjV6UDJHVEJ5QUE2SnNUYTYKSHdlZGFXZ29LMHozeUtvVW9ITC9lT3hwZWRVeUdBcGowVStSendBbExkYi9Kby9FU2l2OW5TUnoxZTFNTUFGZAptS3dMK3FqdmtIcEovK1VJbkMzZ1M4YStGamF2SG9jaE9ZOCtJbUhpdUs0eVR2c0FTeHBtNWlBRFFteHVlbFZwClhyRkdIUW1wcWQwbTVXdUZ5UElvTmhzcGVkTTNiN2lkZjlxVW1Udzc1L0lsWDhoY3pFOXBEbmErMDh2aVhXWGkKUTkzZVpoaXgwRVdWVUNLMUJJeEpKSndjMXNlYUFlOEk1NkRGQ3JMd20xUmVpYmhHcG5rSkplM29qbEJUb0gzUgoxTi93QUFjVzBjVnVwaWVrTmQxTityZStaZDc1NnlLcThjQjhwV0o1UTZFQ2dZRUE2TUFid2UxdWxCbnllT0NXCnBGK2JaMzc2c3MrVG0zR1YvVElxK2lXMG9iemlQZ1hoTXBiZXBBbDVLdGN3QlJuTm0wRjRVV1RuMFJsUG5pS1UKUkhDc2FnRFFwQUJPWEVacDBkTXVldTFrWGxrZ1ZnUFgvSnFuRmJxOFZOdzc5TDVIb1NDbnpFOEsrcDM5MENzRgpJU2FBc0xVTGdzdnhBb2lIUk1CdVpqQlF2M0VDZ1lFQTVHWW5VR3psWTRISG1PUVdOZjNBSjhvbkxwaDVBZTZYCnZmeGZMd2F6cmR4VFIrRFphM25acmZDQ3ZYekVjQ3BLaEFRNDd6SlBDUW1haWhiSFd0eEhtc0lxVHd6SjdhWjQKUHF4OU5xcHNKTG9rR3Z0blVOUkFNYVhOQlF3b2FCUUNVdmNhQ3RBd2VEeEpWWjU1RXU5SklZcGQwVkdVU2VLNQo4Njcvbjk2V0NGY0NnWUJuQnZMQ2l5bFJvWksxY3lUN3FkNk9sNlM5bGlrT3U5N2E3MlFheXFvRWxpbkhycTZhCnlESFJodWY5MExkTzZyY2FySVpuOFRTMFdISG4zQUtwc1A2QkJjOVZhVlZHZjF6RUpxa0NmU2JhcExVdG5oSHoKblRtczRyWVBFbFh2NW5LcW5sdm9rbXlYdDJ2c3c3NUhpRldhNHVrdmdyc3lsZURhekJ1U1hIekI0UUtCZ1FDUApyMGc2UzFkLzR5dzdIZnB2R3VTZzQ0Y0V4RDBVSHhKdEhmQ1BlQXJmYklVajZlczl0dGxmbUxmWEZ6L0pSSUcrClRaMjN0UkdOb1BJTXYwbkkrbDA5bWJyZUlqQ0Noa0NOUlJ3OG9MZ0ozdVJKNlREVTQ4SkN1WWlpRFVUNlBPUTkKWjJDRnZ2VlBIcllQMi9OVkd4NEpzSzlXdUppdVpxa1BDVitkSm4yQ1h3S0JnUUNhZExiRjVGZlBjdmFJWXlvVgpvNTZhMTU0RjRybThxV3VYUlY1QjBRSGplL0NMaERmejVXZlF5REZqbkVIZTR1d25ra21zWmJsZms2aVl1T0t6CkViaUNkQy9MR2RDZzgyVkdQeGdTSkV3R1haRS9KbXJPdkxMZ3YxSkhQaE9UcXJpVTFXK045cGVzSFZXWk1XcGMKV05Oc0tIZm00Tk9XdXlrdXNxcTFZWi94Y2c9PQotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg==
+
+---
+# Ingress для маршрутизации запросов (без host)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-service
+            port:
+              number: 80

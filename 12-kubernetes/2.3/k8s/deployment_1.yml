@@ -1,0 +1,95 @@
+# ConfigMap для HTML-страницы
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-html-config
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Simple Web Page</title>
+    </head>
+    <body>
+        <h1>Welcome to Nginx!</h1>
+        <p>This page is served by Nginx in a Kubernetes Pod.</p>
+    </body>
+    </html>
+
+---
+# Deployment с контейнерами nginx и multitool
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-multitool-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-multitool
+  template:
+    metadata:
+      labels:
+        app: nginx-multitool
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-html-volume
+          mountPath: /usr/share/nginx/html
+      - name: multitool
+        image: wbitt/network-multitool:latest
+        ports:
+        - containerPort: 8080
+        env:
+          - name: HTTP_PORT
+            value: "8080"
+      volumes:
+      - name: nginx-html-volume
+        configMap:
+          name: nginx-html-config
+
+---
+# Service для доступа к приложению
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx-multitool
+  ports:
+    - name: nginx-port
+      protocol: TCP
+      port: 80
+      targetPort: 80 
+    - name: multitool-port
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: NodePort
+
+---
+# Ingress для маршрутизации запросов (без host)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-service
+            port:
+              number: 80
